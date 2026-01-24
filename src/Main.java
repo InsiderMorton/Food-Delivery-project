@@ -1,36 +1,39 @@
-import services.OrderService;
-import exceptions.*;
-import java.util.HashMap;
-import java.util.Map;
-
+import edu.aitu.oop3.models.Order;
+import edu.aitu.oop3.models.OrderItem;
+import edu.aitu.oop3.services.OrderService;
 
 public class Main {
+
     public static void main(String[] args) {
+
         OrderService service = new OrderService();
 
         try {
-            // 1. Формируем корзину (ID блюда -> Количество)
-            Map<Integer, Integer> cart = new HashMap<>();
-            cart.put(1, 2); // 2 Бургера (ID=1)
-            cart.put(2, 1); // 1 Пицца (ID=2)
+            Order order = new Order(1, 1);
 
-            // 2. Делаем заказ для клиента с ID=1
-            System.out.println("1. Placing order...");
-            service.placeOrder(1, cart);
+            // menu_item_id = 1, quantity = 2, price at order = 100 pizza
+            order.addItem(new OrderItem(1, 0, 2, 3, 2500));
 
-            // 3. Смотрим активные заказы
-            System.out.println("\n2. Viewing active orders...");
-            service.viewActiveOrders();
+            // menu_item_id = 2, quantity = 1, price at order = 150 burger
+            order.addItem(new OrderItem(2, 0, 1, 3, 1200));
 
-            // 4. Завершаем заказ (укажите ID, который создался на шаге 2, например 1)
-            System.out.println("\n3. Completing order...");
-            service.completeOrder(1);
+            // menu_item_id = 2, quantity = 1, price at order = 150 ice cream
+            try {
+                System.out.println("Placing order...");
+                Order saved = service.placeOrder(order);
 
-            // 5. Проверяем исключение (заказываем мороженое ID=4, которого нет)
-            System.out.println("\n4. Testing Exception...");
-            Map<Integer, Integer> invalidCart = new HashMap<>();
-            invalidCart.put(4, 1);
-            service.placeOrder(1, invalidCart);
+                System.out.println("\nActive orders:");
+                service.viewActiveOrders().forEach(System.out::println);
+
+                System.out.println("\nCompleting order...");
+                service.completeOrder(saved.getId());
+
+                order.addItem(new OrderItem(2, 0, 4, 1, 300));
+            } catch (Exception e) {
+                System.err.println("ERROR adding ice cream: " + e.getMessage());
+                System.err.println("Order will be placed without ice cream.");
+            }
+
 
         } catch (Exception e) {
             System.err.println("ERROR: " + e.getMessage());
