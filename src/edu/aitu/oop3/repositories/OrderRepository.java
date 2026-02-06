@@ -1,6 +1,8 @@
 package edu.aitu.oop3.repositories;
 
 import edu.aitu.oop3.db.DatabaseConnection;
+import edu.aitu.oop3.factories.DeliveryFactory;
+import edu.aitu.oop3.models.DeliveryType;
 import edu.aitu.oop3.models.Order;
 import edu.aitu.oop3.models.OrderItem;
 
@@ -100,8 +102,15 @@ public class OrderRepository implements Repository<Order, Integer> {
              ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
-                Order order = new Order(rs.getInt("id"), rs.getInt("customer_id"));
+                int id = rs.getInt("id");
+                int customerId = rs.getInt("customer_id");
+                double price = rs.getDouble("total_price");
+
+                Order order = DeliveryFactory.createOrder(DeliveryType.DELIVERY, id, customerId);
+
                 order.setStatus(rs.getString("status"));
+                order.setTotalPrice(price); // Теперь этот метод сработает!
+
                 orders.add(order);
             }
         } catch (SQLException e) {

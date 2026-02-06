@@ -9,6 +9,7 @@ public class Order {
     private String status;
     private List<OrderItem> items;
     private DeliveryType deliveryType;
+    private double totalPrice;
 
     // New constructor with DeliveryType
     public Order(int id, int customerId, DeliveryType deliveryType) {
@@ -54,5 +55,9 @@ public class Order {
                 " | Total: " + getTotalPrice() +
                 " | Status: " + status +
                 " | Type: " + deliveryType.getDisplayName();
+    }
+
+    public void setTotalPrice(double totalPrice) {
+        this.totalPrice = totalPrice;
     }
 }

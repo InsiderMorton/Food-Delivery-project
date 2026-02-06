@@ -44,11 +44,6 @@ public class OrderService {
 
         Order savedOrder = orderRepo.save(order);
 
-        // ✅ ПРОВЕРКА НА NULL
-        if (savedOrder == null) {
-            return Result.fail("Failed to save order to database");
-        }
-
         // Singleton TaxConfig for price breakdown
         TaxConfig taxConfig = TaxConfig.getInstance();
         double subtotal = savedOrder.getTotalPrice();
@@ -61,5 +56,27 @@ public class OrderService {
         System.out.println("  Total with tax: " + taxConfig.calculateTotal(subtotal));
 
         return Result.ok(savedOrder);
+    }
+
+    // Lambda + Stream: filter active orders
+    public List<Order> viewActiveOrders() {
+        return orderRepo.findAll()
+                .stream()
+                .filter(o -> "ACTIVE".equals(o.getStatus()))
+                .collect(Collectors.toList());
+    }
+
+    // Returns Result<Order>
+    public Result<Order> completeOrder(int orderId) throws OrderNotFoundException {
+        Order order = orderRepo.findById(orderId)
+                .orElseThrow(() ->
+                        new OrderNotFoundException("Order not found: " + orderId)
+                );
+
+        order.setStatus("COMPLETED");
+        orderRepo.update(order);
+
+        System.out.println("Order #" + orderId + " completed");
+        return Result.ok(order);
     }
 }
