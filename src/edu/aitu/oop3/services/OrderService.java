@@ -1,11 +1,10 @@
 package edu.aitu.oop3.services;
 
+import edu.aitu.oop3.config.TaxConfig;
 import edu.aitu.oop3.exceptions.InvalidQuantityException;
 import edu.aitu.oop3.exceptions.MenuItemNotAvailableException;
 import edu.aitu.oop3.exceptions.OrderNotFoundException;
-import edu.aitu.oop3.models.MenuItem;
-import edu.aitu.oop3.models.Order;
-import edu.aitu.oop3.models.OrderItem;
+import edu.aitu.oop3.models.*;
 import edu.aitu.oop3.repositories.MenuRepository;
 import edu.aitu.oop3.repositories.OrderRepository;
 
@@ -13,12 +12,11 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class OrderService {
-
     private final MenuRepository menuRepo = new MenuRepository();
     private final OrderRepository orderRepo = new OrderRepository();
 
-    // User Story 1: Place Order
-    public Order placeOrder(Order order)
+    // Returns Result<Order> instead of plain Order (Generics)
+    public Result<Order> placeOrder(Order order)
             throws InvalidQuantityException, MenuItemNotAvailableException {
 
         if (order.getItems().isEmpty()) {
@@ -26,52 +24,42 @@ public class OrderService {
         }
 
         for (OrderItem item : order.getItems()) {
-
             if (item.getQuantity() <= 0) {
-                throw new InvalidQuantityException("Invalid quantity");
+                throw new InvalidQuantityException("Invalid quantity for item: " + item.getMenuItemId());
             }
 
             MenuItem menuItem = menuRepo.findById(item.getMenuItemId())
                     .orElseThrow(() ->
-                            new MenuItemNotAvailableException("Menu item not found")
+                            new MenuItemNotAvailableException("Menu item not found: " + item.getMenuItemId())
                     );
 
             if (!menuItem.isAvailable()) {
-                throw new MenuItemNotAvailableException("Menu item is not available");
+                throw new MenuItemNotAvailableException("Menu item is not available: " + menuItem.getName());
             }
 
             if (item.getQuantity() > menuItem.getAmount()) {
-                throw new InvalidQuantityException("Not enough items in stock");
+                throw new InvalidQuantityException("Not enough stock for: " + menuItem.getName());
             }
         }
 
         Order savedOrder = orderRepo.save(order);
 
-        System.out.println("Order #" + savedOrder.getId() +
-                " placed. Total: " + savedOrder.getTotalPrice());
+        // ✅ ПРОВЕРКА НА NULL
+        if (savedOrder == null) {
+            return Result.fail("Failed to save order to database");
+        }
 
-        return savedOrder;
-    }
+        // Singleton TaxConfig for price breakdown
+        TaxConfig taxConfig = TaxConfig.getInstance();
+        double subtotal = savedOrder.getTotalPrice();
+        double tax = taxConfig.calculateTax(subtotal);
 
-    // User Story 2: View Active Orders
-    public List<Order> viewActiveOrders() {
-        return orderRepo.findAll()
-                .stream()
-                .filter(o -> "ACTIVE".equals(o.getStatus()))
-                .collect(Collectors.toList());
-    }
+        System.out.println("Order #" + savedOrder.getId() + " placed.");
+        System.out.println("  Type: " + savedOrder.getDeliveryType().getDisplayName());
+        System.out.println("  Subtotal: " + subtotal);
+        System.out.println("  Tax (" + (taxConfig.getTaxRate() * 100) + "%): " + tax);
+        System.out.println("  Total with tax: " + taxConfig.calculateTotal(subtotal));
 
-    // User Story 3: Complete Order
-    public void completeOrder(int orderId) throws OrderNotFoundException {
-
-        Order order = orderRepo.findById(orderId)
-                .orElseThrow(() ->
-                        new OrderNotFoundException("Order not found")
-                );
-
-        order.setStatus("COMPLETED");
-        orderRepo.update(order);
-
-        System.out.println("Order #" + orderId + " completed");
+        return Result.ok(savedOrder);
     }
 }

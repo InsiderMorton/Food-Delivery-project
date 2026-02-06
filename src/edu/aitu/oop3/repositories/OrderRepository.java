@@ -2,6 +2,7 @@ package edu.aitu.oop3.repositories;
 
 import edu.aitu.oop3.db.DatabaseConnection;
 import edu.aitu.oop3.models.Order;
+import edu.aitu.oop3.models.OrderItem;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -12,19 +13,37 @@ public class OrderRepository implements Repository<Order, Integer> {
 
     @Override
     public Order save(Order entity) {
-        String sql = "INSERT INTO orders (customer_id, status, total_price) VALUES (?, ?, ?)";
+        String orderSql = "INSERT INTO orders (customer_id, status, total_price) VALUES (?, ?, ?)";
+        String itemSql = "INSERT INTO order_items (order_id, menu_item_id, quantity, price_at_order) VALUES (?, ?, ?, ?)";
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            // 1. Сохранить заказ
+            PreparedStatement orderStmt = conn.prepareStatement(orderSql, Statement.RETURN_GENERATED_KEYS);
+            orderStmt.setInt(1, entity.getCustomerId());
+            orderStmt.setString(2, entity.getStatus());
+            orderStmt.setDouble(3, entity.getTotalPrice());
+            orderStmt.executeUpdate();
 
-            stmt.setInt(1, entity.getCustomerId());
-            stmt.setString(2, entity.getStatus());
-            stmt.setDouble(3, entity.getTotalPrice());
-            stmt.executeUpdate();
-
-            ResultSet keys = stmt.getGeneratedKeys();
+            ResultSet keys = orderStmt.getGeneratedKeys();
             if (keys.next()) {
-                return new Order(keys.getInt(1), entity.getCustomerId());
+                int orderId = keys.getInt(1);
+
+                // 2. Сохранить товары заказа
+                PreparedStatement itemStmt = conn.prepareStatement(itemSql);
+                for (OrderItem item : entity.getItems()) {
+                    itemStmt.setInt(1, orderId);
+                    itemStmt.setInt(2, item.getMenuItemId());
+                    itemStmt.setInt(3, item.getQuantity());
+                    itemStmt.setDouble(4, item.getPriceAtOrder());
+                    itemStmt.addBatch();
+                }
+                itemStmt.executeBatch();
+
+                // 3. Вернуть заказ с реальным ID
+                Order savedOrder = new Order(orderId, entity.getCustomerId(), entity.getDeliveryType());
+                savedOrder.setStatus(entity.getStatus());
+                entity.getItems().forEach(savedOrder::addItem);
+                return savedOrder;
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -34,19 +53,35 @@ public class OrderRepository implements Repository<Order, Integer> {
 
     @Override
     public Optional<Order> findById(Integer id) {
-        String sql = "SELECT * FROM orders WHERE id=?";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+        String orderSql = "SELECT * FROM orders WHERE id=?";
+        String itemsSql = "SELECT * FROM order_items WHERE order_id=?";
 
-            stmt.setInt(1, id);
-            ResultSet rs = stmt.executeQuery();
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            // 1. Загрузить заказ
+            PreparedStatement orderStmt = conn.prepareStatement(orderSql);
+            orderStmt.setInt(1, id);
+            ResultSet rs = orderStmt.executeQuery();
 
             if (rs.next()) {
-                Order order = new Order(
-                        rs.getInt("id"),
-                        rs.getInt("customer_id")
-                );
+                Order order = new Order(rs.getInt("id"), rs.getInt("customer_id"));
                 order.setStatus(rs.getString("status"));
+
+                // 2. Загрузить товары заказа
+                PreparedStatement itemsStmt = conn.prepareStatement(itemsSql);
+                itemsStmt.setInt(1, id);
+                ResultSet itemsRs = itemsStmt.executeQuery();
+
+                while (itemsRs.next()) {
+                    OrderItem item = new OrderItem(
+                            itemsRs.getInt("id"),
+                            itemsRs.getInt("order_id"),
+                            itemsRs.getInt("menu_item_id"),
+                            itemsRs.getInt("quantity"),
+                            itemsRs.getDouble("price_at_order")
+                    );
+                    order.addItem(item);
+                }
+
                 return Optional.of(order);
             }
         } catch (SQLException e) {
@@ -65,10 +100,7 @@ public class OrderRepository implements Repository<Order, Integer> {
              ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
-                Order order = new Order(
-                        rs.getInt("id"),
-                        rs.getInt("customer_id")
-                );
+                Order order = new Order(rs.getInt("id"), rs.getInt("customer_id"));
                 order.setStatus(rs.getString("status"));
                 orders.add(order);
             }
@@ -83,12 +115,10 @@ public class OrderRepository implements Repository<Order, Integer> {
         String sql = "UPDATE orders SET status=? WHERE id=?";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-
             stmt.setString(1, entity.getStatus());
             stmt.setInt(2, entity.getId());
             stmt.executeUpdate();
             return entity;
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -100,10 +130,8 @@ public class OrderRepository implements Repository<Order, Integer> {
         String sql = "DELETE FROM orders WHERE id=?";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-
             stmt.setInt(1, id);
             return stmt.executeUpdate() > 0;
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -116,9 +144,7 @@ public class OrderRepository implements Repository<Order, Integer> {
         try (Connection conn = DatabaseConnection.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
-
             if (rs.next()) return rs.getInt(1);
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -130,10 +156,8 @@ public class OrderRepository implements Repository<Order, Integer> {
         String sql = "SELECT 1 FROM orders WHERE id=?";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-
             stmt.setInt(1, id);
             return stmt.executeQuery().next();
-
         } catch (SQLException e) {
             e.printStackTrace();
         }

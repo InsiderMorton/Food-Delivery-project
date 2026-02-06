@@ -4,17 +4,24 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Order {
-
     private int id;
     private int customerId;
     private String status;
     private List<OrderItem> items;
+    private DeliveryType deliveryType;
 
-    public Order(int id, int customerId) {
+    // New constructor with DeliveryType
+    public Order(int id, int customerId, DeliveryType deliveryType) {
         this.id = id;
         this.customerId = customerId;
         this.status = "ACTIVE";
         this.items = new ArrayList<>();
+        this.deliveryType = deliveryType;
+    }
+
+    // Old constructor - backward compatibility (default = DELIVERY)
+    public Order(int id, int customerId) {
+        this(id, customerId, DeliveryType.DELIVERY);
     }
 
     public void addItem(OrderItem item) {
@@ -28,6 +35,7 @@ public class Order {
     public int getId() { return id; }
     public int getCustomerId() { return customerId; }
     public String getStatus() { return status; }
+    public DeliveryType getDeliveryType() { return deliveryType; }
 
     public void setStatus(String status) {
         this.status = status;
@@ -44,6 +52,7 @@ public class Order {
         return "Order #" + id +
                 " | Customer: " + customerId +
                 " | Total: " + getTotalPrice() +
-                " | Status: " + status;
+                " | Status: " + status +
+                " | Type: " + deliveryType.getDisplayName();
     }
 }
