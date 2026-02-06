@@ -102,14 +102,31 @@ public class OrderRepository implements Repository<Order, Integer> {
              ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
-                int id = rs.getInt("id");
+
+                int orderId = rs.getInt("id");
                 int customerId = rs.getInt("customer_id");
-                double price = rs.getDouble("total_price");
 
-                Order order = DeliveryFactory.createOrder(DeliveryType.DELIVERY, id, customerId);
 
+                Order order = DeliveryFactory.createOrder(DeliveryType.DELIVERY, orderId, customerId);
                 order.setStatus(rs.getString("status"));
-                order.setTotalPrice(price); // Теперь этот метод сработает!
+                order.setTotalPrice(rs.getDouble("total_price"));
+
+
+                String itemsSql = "SELECT * FROM order_items WHERE order_id = ?";
+                try (PreparedStatement itemStmt = conn.prepareStatement(itemsSql)) {
+                    itemStmt.setInt(1, orderId);
+                    ResultSet itemRs = itemStmt.executeQuery();
+                    while (itemRs.next()) {
+                        order.addItem(new OrderItem(
+                                itemRs.getInt("id"),
+                                orderId,
+                                itemRs.getInt("menu_item_id"),
+                                itemRs.getInt("quantity"),
+                                itemRs.getDouble("price_at_order")
+                        ));
+                    }
+                }
+
 
                 orders.add(order);
             }
