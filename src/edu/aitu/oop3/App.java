@@ -77,7 +77,7 @@ public class App {
 
         // Service methods now return Result<Order>
 
-        System.out.println("===== GENERICS: Result<T> ====");
+        System.out.println("==== GENERICS: Result<T> ====");
         try {
             Result<Order> placeResult = service.placeOrder(deliveryOrder);
             System.out.println(placeResult);
